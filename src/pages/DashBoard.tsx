@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef } from "react";
+import { EventSource } from "eventsource";
 import {
   Plus,
   Trash2,
@@ -24,8 +25,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
 } from "recharts";
 import axios from "axios";
 
@@ -438,6 +437,14 @@ export default function Dashboard() {
 
     const eventSource = new EventSource(`${API_BASE}/alerts/sse`, {
       withCredentials: true,
+      fetch: (input, init) =>
+        fetch(input, {
+          ...init,
+          headers: {
+            ...init.headers,
+            Authorization: `Bearer ${token}`,
+          },
+        }),
     });
 
     eventSource.onmessage = (event) => {
@@ -467,6 +474,14 @@ export default function Dashboard() {
 
     const eventSource = new EventSource(`${API_BASE}/device-events/sse`, {
       withCredentials: true,
+      fetch: (input, init) =>
+        fetch(input, {
+          ...init,
+          headers: {
+            ...init.headers,
+            Authorization: `Bearer ${token}`,
+          },
+        }),
     });
 
     eventSource.onmessage = (event) => {
@@ -498,7 +513,17 @@ export default function Dashboard() {
 
     const eventSource = new EventSource(
       `${API_BASE}/sensor-data/${selectedDeviceId}/sse`,
-      { withCredentials: true }
+      {
+        withCredentials: true,
+        fetch: (input, init) =>
+          fetch(input, {
+            ...init,
+            headers: {
+              ...init.headers,
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+      }
     );
 
     eventSource.onmessage = (event) => {
@@ -1102,11 +1127,11 @@ export default function Dashboard() {
   const formatSensorValue = (value: number) => {
     // Nếu giá trị rất nhỏ (< 0.01), hiển thị 6 chữ số thập phân
     if (Math.abs(value) < 0.01 && value !== 0) {
-      return value.toFixed(6);
+      return value.toFixed(8);
     }
     // Nếu giá trị < 1, hiển thị 4 chữ số thập phân
     if (Math.abs(value) < 1 && value !== 0) {
-      return value.toFixed(4);
+      return value.toFixed(6);
     }
     // Ngược lại hiển thị 2 chữ số thập phân
     return value.toFixed(2);
@@ -1304,9 +1329,7 @@ export default function Dashboard() {
                     </p>
                     <p className="text-3xl font-bold text-white mt-2">
                       {currentLatestData
-                        ? formatSensorValue(
-                            currentLatestData.value,
-                          )
+                        ? formatSensorValue(currentLatestData.value)
                         : "N/A"}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
@@ -1321,9 +1344,7 @@ export default function Dashboard() {
                     </p>
                     <p className="text-3xl font-bold text-green-400 mt-2">
                       {currentAnalytics
-                        ? formatSensorValue(
-                            currentAnalytics.avgValue,
-                          )
+                        ? formatSensorValue(currentAnalytics.avgValue)
                         : "N/A"}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
@@ -1336,9 +1357,7 @@ export default function Dashboard() {
                     </p>
                     <p className="text-3xl font-bold text-red-400 mt-2">
                       {currentAnalytics
-                        ? formatSensorValue(
-                            currentAnalytics.maxValue,
-                          )
+                        ? formatSensorValue(currentAnalytics.maxValue)
                         : "N/A"}
                     </p>
                     {currentThreshold && (
@@ -1353,9 +1372,7 @@ export default function Dashboard() {
                     </p>
                     <p className="text-3xl font-bold text-blue-400 mt-2">
                       {currentAnalytics
-                        ? formatSensorValue(
-                            currentAnalytics.minValue,
-                          )
+                        ? formatSensorValue(currentAnalytics.minValue)
                         : "N/A"}
                     </p>
                     {currentThreshold && (
@@ -1376,9 +1393,7 @@ export default function Dashboard() {
                             Predicted Value (Next Period)
                           </p>
                           <p className="text-3xl font-bold text-purple-400 mt-1">
-                            {formatSensorValue(
-                              currentAnalytics.predictedValue,
-                            )}
+                            {formatSensorValue(currentAnalytics.predictedValue)}
                           </p>
                         </div>
                       </div>
@@ -1389,7 +1404,7 @@ export default function Dashboard() {
                   {/* Line Chart */}
                   <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
                     <h3 className="text-xl font-bold text-white mb-4">
-                      Sensor Trend - {selectedSensorType}
+                      Sensor Trend
                     </h3>
                     {chartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height={300}>
@@ -1407,7 +1422,7 @@ export default function Dashboard() {
                           />
                           <YAxis
                             stroke="#94a3b8"
-                            tickFormatter={(value) => Number(value).toFixed(4)}
+                            tickFormatter={(value) => Number(value).toFixed(5)}
                           />
                           <Tooltip
                             contentStyle={{
@@ -1415,9 +1430,7 @@ export default function Dashboard() {
                               border: "1px solid #475569",
                             }}
                             formatter={(value: string) => [
-                              formatSensorValue(
-                                parseFloat(value),
-                              ),
+                              formatSensorValue(parseFloat(value)),
                               "Value",
                             ]}
                           />
@@ -1444,144 +1457,87 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  {/* Bar Chart */}
+                  {/* Today's Analytics Table - Always show */}
                   <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
                     <h3 className="text-xl font-bold text-white mb-4">
-                      Sensor Distribution
+                      Today's Analytics
                     </h3>
-                    {chartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={chartData}>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="#475569"
-                          />
-                          <XAxis
-                            dataKey="time"
-                            stroke="#94a3b8"
-                            angle={-45}
-                            textAnchor="end"
-                            height={80}
-                          />
-                          <YAxis
-                            stroke="#94a3b8"
-                            tickFormatter={(value) => Number(value).toFixed(4)}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#1e293b",
-                              border: "1px solid #475569",
-                            }}
-                            formatter={(value: string) => [
-                              formatSensorValue(
-                                parseFloat(value),
-                              ),
-                              "Value",
-                            ]}
-                          />
-                          <Bar
-                            dataKey="value"
-                            fill="#10b981"
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-[300px] flex items-center justify-center">
-                        <div className="text-center text-slate-400">
-                          <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                          <p>Waiting for sensor data...</p>
-                          <p className="text-xs mt-1">
-                            Data will appear when received from device
-                          </p>
-                        </div>
+                    {currentAnalytics ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead className="bg-slate-700">
+                            <tr>
+                              <th className="px-4 py-3 text-slate-300">
+                                Metric
+                              </th>
+                              <th className="px-4 py-3 text-slate-300">
+                                Value
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-700">
+                            <tr>
+                              <td className="px-4 py-3 text-slate-300">
+                                Average
+                              </td>
+                              <td className="px-4 py-3 text-white font-medium">
+                                {formatSensorValue(currentAnalytics.avgValue)}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-3 text-slate-300">
+                                Maximum
+                              </td>
+                              <td className="px-4 py-3 text-white font-medium">
+                                {formatSensorValue(currentAnalytics.maxValue)}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-3 text-slate-300">
+                                Minimum
+                              </td>
+                              <td className="px-4 py-3 text-white font-medium">
+                                {formatSensorValue(currentAnalytics.minValue)}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-3 text-slate-300">
+                                Data Points
+                              </td>
+                              <td className="px-4 py-3 text-white font-medium">
+                                {currentAnalytics.dataPoints}
+                              </td>
+                            </tr>
+                            {currentAnalytics.predictedValue !== null &&
+                              currentAnalytics.predictedValue !== undefined && (
+                                <tr>
+                                  <td className="px-4 py-3 text-slate-300">
+                                    Predicted Value
+                                  </td>
+                                  <td className="px-4 py-3 text-white font-medium">
+                                    {formatSensorValue(
+                                      currentAnalytics.predictedValue
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            <tr>
+                              <td className="px-4 py-3 text-slate-300">
+                                Processed At
+                              </td>
+                              <td className="px-4 py-3 text-white font-medium">
+                                {formatToUTC7(currentAnalytics.processedAt)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
+                    ) : (
+                      <p className="text-center text-slate-400 py-8">
+                        No analytics data available for today
+                      </p>
                     )}
                   </div>
-                </div>
-
-                {/* Today's Analytics Table - Always show */}
-                <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
-                  <h3 className="text-xl font-bold text-white mb-4">
-                    Today's Analytics - {selectedSensorType}
-                  </h3>
-                  {currentAnalytics ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                        <thead className="bg-slate-700">
-                          <tr>
-                            <th className="px-4 py-3 text-slate-300">Metric</th>
-                            <th className="px-4 py-3 text-slate-300">Value</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-700">
-                          <tr>
-                            <td className="px-4 py-3 text-slate-300">
-                              Average
-                            </td>
-                            <td className="px-4 py-3 text-white font-medium">
-                              {formatSensorValue(
-                                currentAnalytics.avgValue,
-                              )}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-slate-300">
-                              Maximum
-                            </td>
-                            <td className="px-4 py-3 text-white font-medium">
-                              {formatSensorValue(
-                                currentAnalytics.maxValue,
-                              )}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-slate-300">
-                              Minimum
-                            </td>
-                            <td className="px-4 py-3 text-white font-medium">
-                              {formatSensorValue(
-                                currentAnalytics.minValue,
-                              )}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-slate-300">
-                              Data Points
-                            </td>
-                            <td className="px-4 py-3 text-white font-medium">
-                              {currentAnalytics.dataPoints}
-                            </td>
-                          </tr>
-                          {currentAnalytics.predictedValue !== null &&
-                            currentAnalytics.predictedValue !== undefined && (
-                              <tr>
-                                <td className="px-4 py-3 text-slate-300">
-                                  Predicted Value
-                                </td>
-                                <td className="px-4 py-3 text-white font-medium">
-                                  {formatSensorValue(
-                                    currentAnalytics.predictedValue,
-                                  )}
-                                </td>
-                              </tr>
-                            )}
-                          <tr>
-                            <td className="px-4 py-3 text-slate-300">
-                              Processed At
-                            </td>
-                            <td className="px-4 py-3 text-white font-medium">
-                              {formatToUTC7(currentAnalytics.processedAt)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-center text-slate-400 py-8">
-                      No analytics data available for today
-                    </p>
-                  )}
                 </div>
               </>
             )}
